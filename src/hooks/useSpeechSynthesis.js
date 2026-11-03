@@ -44,8 +44,12 @@ export function useSpeechSynthesis() {
       let matchedVoice = null;
 
       if (language === 'Hindi') {
-        matchedVoice = currentVoices.find((v) => v.lang.startsWith('hi')) || null;
+        utterance.lang = 'hi-IN';
+        matchedVoice = currentVoices.find((v) => v.lang === 'hi-IN' || v.lang.startsWith('hi')) 
+          || currentVoices.find((v) => v.name.toLowerCase().includes('hindi') || v.name.toLowerCase().includes('kalpana') || v.name.toLowerCase().includes('hemant'))
+          || null;
       } else {
+        utterance.lang = 'en-US';
         // Find natural English voice (Google US English, Samantha, Daniel, Natural, etc.)
         matchedVoice = currentVoices.find((v) => 
           v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel'))

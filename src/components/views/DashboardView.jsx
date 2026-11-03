@@ -16,6 +16,7 @@ import {
   Code2,
   Info
 } from 'lucide-react';
+import { calculateGrade } from '../../utils/grading';
 
 export default function DashboardView({ 
   sessionHistory = [], 
@@ -29,8 +30,12 @@ export default function DashboardView({
   // Real vs Sample Benchmark Data
   const totalSessions = hasRealHistory ? sessionHistory.length : 0;
   
-  const avgScore = hasRealHistory
-    ? Math.round(sessionHistory.reduce((acc, curr) => acc + (curr.totalScore || 0), 0) / sessionHistory.length)
+  const validScores = sessionHistory
+    .map((s) => Number(s.totalScore))
+    .filter((s) => Number.isFinite(s));
+
+  const avgScore = validScores.length > 0
+    ? Math.round(validScores.reduce((acc, curr) => acc + curr, 0) / validScores.length)
     : 0;
 
   // Weak topics: from real sessions if available, else empty or clean benchmark preview
@@ -42,8 +47,9 @@ export default function DashboardView({
   const computeSubjectScore = (subName, fallbackScore) => {
     if (!hasRealHistory) return fallbackScore;
     const matches = sessionHistory.filter((s) => (s.subject || '').toLowerCase().includes(subName.toLowerCase()));
-    if (matches.length === 0) return fallbackScore;
-    return Math.round(matches.reduce((acc, curr) => acc + curr.totalScore, 0) / matches.length);
+    const valid = matches.map((m) => Number(m.totalScore)).filter((s) => Number.isFinite(s));
+    if (valid.length === 0) return fallbackScore;
+    return Math.round(valid.reduce((acc, curr) => acc + curr, 0) / valid.length);
   };
 
   const subjectPerformance = [
@@ -82,7 +88,7 @@ export default function DashboardView({
       date: 'Sample Benchmark',
       subject: 'Computer Networks',
       topic: 'TCP 3-Way Handshake',
-      totalScore: 88,
+      totalScore: 92,
       overallGrade: 'A+',
       readinessStatus: 'Viva Ready',
       weakConcepts: ['SYN Flood Defense'],
@@ -167,7 +173,7 @@ export default function DashboardView({
             )}
           </div>
           <div className="text-[11px] text-indigo-300 font-semibold">
-            {hasRealHistory ? `Grade: ${avgScore >= 85 ? 'A+' : avgScore >= 75 ? 'A' : 'B+'}` : 'Evaluated after 1st session'}
+            {hasRealHistory ? `Grade: ${calculateGrade(avgScore)}` : 'Evaluated after 1st session'}
           </div>
         </div>
 
@@ -244,20 +250,23 @@ export default function DashboardView({
             })}
           </div>
 
-          {/* Mini Learning Trend Graphic */}
+          {/* Mini Learning Trend Graphic (Chronological: S1 earliest to S5 latest) */}
           <div className="pt-4 border-t border-slate-800/80">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">
-              Score Trajectory {hasRealHistory ? '(Your Sessions)' : '(Benchmark Pattern)'}
+              Score Trajectory {hasRealHistory ? '(Your Sessions, Chronological)' : '(Benchmark Pattern)'}
             </span>
             <div className="flex items-end justify-between h-20 gap-2 px-2">
-              {(hasRealHistory ? sessionHistory.slice(0, 5).map(s => s.totalScore) : [68, 74, 82, 79, 88]).map((val, idx) => (
+              {(hasRealHistory
+                ? [...sessionHistory].slice(0, 5).reverse().map(s => (Number.isFinite(s.totalScore) ? s.totalScore : 0))
+                : [68, 74, 82, 79, 88]
+              ).map((val, idx) => (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group">
                   <span className="text-[10px] text-slate-400 font-mono group-hover:text-white transition-colors">
                     {val}%
                   </span>
                   <div
                     className="w-full rounded-t-lg bg-gradient-to-t from-indigo-700 to-cyan-400 group-hover:brightness-125 transition-all"
-                    style={{ height: `${(val / 100) * 60}px` }}
+                    style={{ height: `${Math.max(4, (val / 100) * 60)}px` }}
                   />
                   <span className="text-[10px] text-slate-500 font-semibold">S{idx + 1}</span>
                 </div>
@@ -404,10 +413,10 @@ export default function DashboardView({
               <div className="flex items-center gap-4 self-end sm:self-auto">
                 <div className="text-right">
                   <div className="text-lg font-black text-indigo-400">
-                    {item.totalScore || 80}<span className="text-xs font-normal text-slate-500"> / 100</span>
+                    {Number.isFinite(item.totalScore) ? item.totalScore : '--'}<span className="text-xs font-normal text-slate-500"> / 100</span>
                   </div>
                   <span className="text-[10px] font-bold text-emerald-400 uppercase">
-                    Grade {item.overallGrade || 'A'}
+                    Grade {Number.isFinite(item.totalScore) ? calculateGrade(item.totalScore) : (item.overallGrade || '--')}
                   </span>
                 </div>
 

@@ -18,6 +18,7 @@ import {
   checkBackendHealth,
   getSavedApiKey 
 } from './services/vivaService';
+import { calculateGrade, getReadinessStatus } from './utils/grading';
 
 export default function App() {
   // Navigation: 'landing' | 'dashboard' | 'configure' | 'viva' | 'report' | 'revision'
@@ -175,10 +176,30 @@ export default function App() {
           subject: sessionConfig.subject,
           topic: sessionConfig.topic,
           sessionResults: conversationHistory,
+          language: sessionConfig.language,
         });
 
         const synthReport = reportRes.report || reportRes;
-        setFinalReport(synthReport);
+
+        // Safe score and institutional grade calculation
+        const rawScore = Number.isFinite(synthReport.totalScore)
+          ? synthReport.totalScore
+          : (Number.isFinite(synthReport.averageScoreOutOf10) ? Math.round(synthReport.averageScoreOutOf10 * 10) : 0);
+        const finalScore = Math.max(0, Math.min(100, rawScore));
+        const finalAvg = Number.isFinite(synthReport.averageScoreOutOf10)
+          ? synthReport.averageScoreOutOf10
+          : Number((finalScore / 10).toFixed(1));
+        const finalGrade = calculateGrade(finalScore);
+        const finalStatus = synthReport.readinessStatus || getReadinessStatus(finalScore, sessionConfig.language);
+
+        const normalizedReport = {
+          ...synthReport,
+          totalScore: finalScore,
+          averageScoreOutOf10: finalAvg,
+          overallGrade: finalGrade,
+          readinessStatus: finalStatus,
+        };
+        setFinalReport(normalizedReport);
 
         // Save session record to history
         const sessionRecord = {
@@ -189,14 +210,14 @@ export default function App() {
           difficulty: sessionConfig.difficulty,
           persona: sessionConfig.persona,
           language: sessionConfig.language,
-          totalScore: synthReport.totalScore || 80,
-          averageScoreOutOf10: synthReport.averageScoreOutOf10 || Number(((synthReport.totalScore || 80) / 10).toFixed(1)),
-          conceptualScore: synthReport.conceptualScore,
-          technicalScore: synthReport.technicalScore,
-          completenessScore: synthReport.completenessScore,
-          articulationScore: synthReport.articulationScore,
-          overallGrade: synthReport.overallGrade || 'A',
-          readinessStatus: synthReport.readinessStatus || 'Solid Foundation',
+          totalScore: finalScore,
+          averageScoreOutOf10: finalAvg,
+          conceptualScore: synthReport.conceptualScore ?? finalScore,
+          technicalScore: synthReport.technicalScore ?? finalScore,
+          completenessScore: synthReport.completenessScore ?? finalScore,
+          articulationScore: synthReport.articulationScore ?? finalScore,
+          overallGrade: finalGrade,
+          readinessStatus: finalStatus,
           weakConcepts: synthReport.weakConcepts || [],
           strongConcepts: synthReport.strongConcepts || [],
           revisionChecklist: synthReport.revisionChecklist || [],
@@ -281,6 +302,13 @@ export default function App() {
 
   // Review a past report from dashboard
   const handleReviewPastReport = (pastSession) => {
+    const rawScore = Number.isFinite(pastSession.totalScore)
+      ? pastSession.totalScore
+      : (Number.isFinite(pastSession.averageScoreOutOf10) ? Math.round(pastSession.averageScoreOutOf10 * 10) : 0);
+    const validScore = Math.max(0, Math.min(100, rawScore));
+    const validGrade = calculateGrade(validScore);
+    const validStatus = pastSession.readinessStatus || getReadinessStatus(validScore, pastSession.language || 'English');
+
     setSessionConfig({
       subject: pastSession.subject,
       topic: pastSession.topic,
@@ -290,16 +318,16 @@ export default function App() {
       count: (pastSession.sessionResults || []).length || 3,
     });
     setFinalReport({
-      totalScore: pastSession.totalScore,
-      averageScoreOutOf10: pastSession.averageScoreOutOf10 || Number(((pastSession.totalScore || 80) / 10).toFixed(1)),
-      conceptualScore: pastSession.conceptualScore || Math.min(pastSession.totalScore + 4, 98),
-      technicalScore: pastSession.technicalScore || Math.max(pastSession.totalScore - 5, 45),
-      completenessScore: pastSession.completenessScore || Math.max(pastSession.totalScore - 2, 50),
-      articulationScore: pastSession.articulationScore || Math.min(pastSession.totalScore + 2, 95),
-      overallGrade: pastSession.overallGrade,
-      readinessStatus: pastSession.readinessStatus,
-      strongConcepts: pastSession.strongConcepts,
-      weakConcepts: pastSession.weakConcepts,
+      totalScore: validScore,
+      averageScoreOutOf10: pastSession.averageScoreOutOf10 ?? Number((validScore / 10).toFixed(1)),
+      conceptualScore: pastSession.conceptualScore ?? Math.min(validScore + 4, 98),
+      technicalScore: pastSession.technicalScore ?? Math.max(validScore - 5, 45),
+      completenessScore: pastSession.completenessScore ?? Math.max(validScore - 2, 50),
+      articulationScore: pastSession.articulationScore ?? Math.min(validScore + 2, 95),
+      overallGrade: validGrade,
+      readinessStatus: validStatus,
+      strongConcepts: pastSession.strongConcepts || [],
+      weakConcepts: pastSession.weakConcepts || [],
       revisionChecklist: pastSession.revisionChecklist || [],
       examinerExecutiveSummary: pastSession.examinerExecutiveSummary || '',
     });

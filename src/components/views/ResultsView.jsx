@@ -10,6 +10,7 @@ import {
   Printer
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { calculateGrade } from '../../utils/grading';
 
 export default function ResultsView({
   sessionResults = [],
@@ -18,6 +19,8 @@ export default function ResultsView({
   onRetakeViva,
   onChooseNewTopic,
 }) {
+  const calculatedGrade = performanceSummary.overallGrade || calculateGrade(Number(performanceSummary.scorePercentage) || 0);
+
   // Fire subtle celebratory confetti on mount if average score is good
   useEffect(() => {
     if (performanceSummary.averageScore >= 6.0) {
@@ -39,9 +42,10 @@ export default function ResultsView({
   };
 
   const getGradeColor = (grade) => {
-    if (grade.startsWith('A')) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    if (grade.startsWith('B')) return 'bg-blue-100 text-blue-800 border-blue-300';
-    return 'bg-amber-100 text-amber-800 border-amber-300';
+    if ((grade || '').startsWith('A')) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    if ((grade || '').startsWith('B')) return 'bg-blue-100 text-blue-800 border-blue-300';
+    if ((grade || '').startsWith('C')) return 'bg-amber-100 text-amber-800 border-amber-300';
+    return 'bg-rose-100 text-rose-800 border-rose-300';
   };
 
   return (
@@ -85,9 +89,9 @@ export default function ResultsView({
               </div>
             </div>
 
-            <div className={`px-4 py-3 rounded-2xl border text-center ${getGradeColor(performanceSummary.overallGrade)}`}>
+            <div className={`px-4 py-3 rounded-2xl border text-center ${getGradeColor(calculatedGrade)}`}>
               <div className="text-[10px] font-bold uppercase">Grade</div>
-              <div className="text-2xl font-black">{performanceSummary.overallGrade}</div>
+              <div className="text-2xl font-black">{calculatedGrade}</div>
             </div>
           </div>
 

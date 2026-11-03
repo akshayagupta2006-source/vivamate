@@ -80,7 +80,7 @@ export function getPersonaInstruction(persona = 'Friendly Professor', language =
   }
 
   const langInstruction = language === 'Hindi'
-    ? 'Conduct the viva primarily in Hindi (Hinglish technical terms like "deadlock", "process", "memory" can be kept in Latin or Devanagari script for academic clarity).'
+    ? 'You MUST conduct the viva completely in natural, articulate Hindi (Devanagari script). Standard technical terms like "deadlock", "process", "memory", "safe state", "Banker\'s algorithm" can remain in Latin/English or Devanagari script for academic clarity, but all oral questions, reactions, and explanations must be spoken in Hindi. Never output English explanations when Hindi is selected.'
     : 'Conduct the viva in clear, articulate English.';
 
   return `${tone} ${langInstruction} Keep your oral questions concise and spoken-friendly (2-3 sentences max) so they are easy to listen to.`;
@@ -110,6 +110,10 @@ export async function generateInitialQuestion({
   ];
   const chosenAngle = focusAngles[Math.floor(Math.random() * focusAngles.length)];
 
+  const langRule = language === 'Hindi'
+    ? 'CRITICAL LANGUAGE RULE: Because the viva is conducted in Hindi, the oral "question", "modelAnswer", and "context" MUST be generated in natural, fluent Hindi (Devanagari script). Standard technical terms like Deadlock or Banker\'s Algorithm may remain in English, but the question itself MUST be in Hindi.'
+    : 'Formulate the question in clear, articulate English.';
+
   const prompt = `
 ${getPersonaInstruction(persona, language)}
 
@@ -118,6 +122,7 @@ Subject: ${subject}
 Topic: ${topic}
 Difficulty Level: ${difficulty}
 Session Focus Angle: ${chosenAngle}
+${langRule}
 
 Task: Formulate the FIRST question for this oral examination focusing on ${chosenAngle}. It should be conceptual, clear, and test understanding. Make it distinct, engaging, and suitable for a university viva.
 
@@ -168,6 +173,12 @@ export async function evaluateTurnAndFollowUp({
     ...conversationHistory.map((h) => h.question?.question || h.question || ''),
   ].filter(Boolean);
 
+  const langRule = language === 'Hindi'
+    ? `CRITICAL LANGUAGE REQUIREMENT: Because the examination language is Hindi:
+   - Formulate 'examinerReaction', 'nextQuestion.question', 'nextQuestion.modelAnswer', 'nextQuestion.context', 'evaluation.feedbackSummary', and 'evaluation.improvementTips' strictly in natural, articulate Hindi (Devanagari script).
+   - Technical terms (Deadlock, Safe State, Banker's Algorithm, etc.) may be mentioned in English or Hindi, but all feedback and follow-up question sentences must be in Hindi.`
+    : '';
+
   const prompt = `
 ${getPersonaInstruction(persona, language)}
 
@@ -183,11 +194,13 @@ ${conversationHistory.map((h, i) => `Turn ${i + 1}: Q: ${h.question?.question ||
 
 Already Asked Questions in this session:
 ${previousQuestions.map((q) => `- "${q}"`).join('\n')}
+${langRule}
 
 Tasks:
 1. SEMANTIC EVALUATION:
    - Evaluate conceptual understanding, technical accuracy, relevance, and completeness (score 0 to 10).
    - Identify which key concepts were covered and which critical points/keywords were omitted.
+   - Note: Student's answer may be in Hindi or English (Hinglish technical response). Evaluate its conceptual meaning fairly.
    - Provide constructive, actionable feedback.
 2. EXAMINER ORAL REACTION:
    - Speak 1-2 natural sentences reacting to the student's answer in persona.
@@ -235,7 +248,7 @@ Return ONLY a valid JSON object matching this schema:
 /**
  * Generate a subtle hint when student is stuck
  */
-export async function generateAIHint({ question, topic, apiKey }) {
+export async function generateAIHint({ question, topic, language = 'English', apiKey }) {
   const ai = getGeminiClient(apiKey);
   if (!ai) return null;
 
@@ -243,8 +256,10 @@ export async function generateAIHint({ question, topic, apiKey }) {
 You are a helpful academic examiner.
 Question: "${question}"
 Topic: "${topic}"
+Language: ${language}
 
 Task: Give a small, subtle conceptual hint (1 sentence) that guides the student toward the answer without directly giving away the solution.
+${language === 'Hindi' ? 'CRITICAL: The hint MUST be written in clear Hindi (Devanagari script).' : 'The hint must be in English.'}
 
 Return JSON:
 {
@@ -275,6 +290,7 @@ Topic: "${topic}"
 Language: ${language}
 
 Task: Rephrase the question in simpler, more direct terms in 1-2 sentences.
+${language === 'Hindi' ? 'CRITICAL: The clarification MUST be written in clear Hindi (Devanagari script).' : 'The clarification must be in English.'}
 
 Return JSON:
 {
@@ -298,6 +314,7 @@ export async function generateFinalReport({
   subject,
   topic,
   sessionResults = [],
+  language = 'English',
   apiKey,
 }) {
   const ai = getGeminiClient(apiKey);
@@ -308,15 +325,25 @@ Act as an academic examination board. Review this complete student viva examinat
 
 Subject: ${subject}
 Topic: ${topic}
+Language of Examination: ${language}
 Session Transcript & Evaluations:
 ${JSON.stringify(sessionResults, null, 2)}
 
 Tasks:
 1. Synthesize overall performance into a score out of 100.
 2. Provide sub-scores out of 100 for: Conceptual Understanding, Technical Accuracy, Completeness, and Articulation.
-3. Determine Letter Grade (A+, A, B+, B, C, D) and Examiner Readiness Diagnosis.
-4. Identify Mastered Concepts and Critical Weak Concepts that need revision.
-5. Provide actionable revision suggestions and recommended next practice topics.
+3. Determine Letter Grade strictly using this institutional scale:
+   - 90–100: A+
+   - 80–89: A
+   - 70–79: B+
+   - 60–69: B
+   - 50–59: C
+   - 40–49: D
+   - 0–39: F
+4. Provide Examiner Readiness Diagnosis.
+5. Identify Mastered Concepts and Critical Weak Concepts that need revision.
+6. Provide actionable revision suggestions and recommended next practice topics.
+${language === 'Hindi' ? 'LANGUAGE RULE: Since the viva was conducted in Hindi, the fields "readinessStatus", "revisionChecklist", "examinerExecutiveSummary", and "recommendedNextTopic" MUST be written in natural, formal Hindi (Devanagari script).' : ''}
 
 Return ONLY a valid JSON object matching this schema:
 {

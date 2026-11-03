@@ -154,6 +154,7 @@ export default function VoiceExamRoomView({
     const res = await requestAIHint({
       question: currentQuestion.question,
       topic: config.topic,
+      language: config.language,
     });
     setHintMessage(res.hint);
     setIsRequestingHelp(false);

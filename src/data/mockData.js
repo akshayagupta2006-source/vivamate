@@ -267,10 +267,258 @@ export const MOCK_QUESTIONS_DATABASE = {
   ],
 };
 
+// Hindi Curated Question Database for full bilingual examination support
+export const MOCK_QUESTIONS_DATABASE_HINDI = {
+  'os-deadlocks': [
+    {
+      id: 'os-d-1-hi',
+      subject: 'Operating Systems',
+      topic: 'Deadlocks & Banker\'s Algorithm',
+      difficulty: 'Intermediate',
+      question: 'Operating System में Deadlock होने के लिए आवश्यक चार Coffman conditions कौन सी हैं? एक OS इनमें से किसी एक condition को तोड़कर Deadlock को कैसे रोकता है?',
+      context: 'परीक्षक यह देखना चाहता है कि क्या आप Deadlock के मूलभूत सिद्धांतों और रोकथाम (prevention) को समझते हैं।',
+      keyConcepts: [
+        'Mutual Exclusion',
+        'Hold and Wait',
+        'No Preemption',
+        'Circular Wait',
+        'Resource ordering',
+      ],
+      sampleAnswer: 'Deadlock के लिए चार Coffman conditions का एक साथ होना आवश्यक है: 1) Mutual Exclusion (संसाधन साझा नहीं किए जा सकते), 2) Hold and Wait (प्रक्रिया नए संसाधन का अनुरोध कर सकती है), 3) No Preemption (संसाधन छीने नहीं जा सकते), और 4) Circular Wait (चक्रीय प्रतीक्षा)। एक OS circular wait को रोकने के लिए सभी संसाधनों को एक संख्यात्मक क्रम (numerical order) आवंटित करता है जिससे Deadlock नहीं हो पाता।',
+      sampleRubric: {
+        allFourNamed: 4,
+        explanationOfConditions: 3,
+        preventionMechanism: 3,
+      },
+    },
+    {
+      id: 'os-d-2-hi',
+      subject: 'Operating Systems',
+      topic: 'Deadlocks & Banker\'s Algorithm',
+      difficulty: 'Advanced',
+      question: 'Banker\'s Algorithm क्या है? Safe State और Unsafe State के बीच क्या अंतर है? क्या Unsafe State का अर्थ हमेशा यह होता है कि Deadlock हो चुका है?',
+      context: 'परीक्षक यह परीक्षण करता है कि क्या छात्र Unsafe State और सक्रिय Deadlock के बीच भ्रमित होते हैं।',
+      keyConcepts: [
+        'Safe State definition',
+        'Unsafe state definition',
+        'Unsafe state does not imply immediate deadlock',
+        'Need matrix calculation',
+        'Safety algorithm iteration',
+      ],
+      sampleAnswer: 'Banker\'s Algorithm एक Deadlock Avoidance एल्गोरिथ्म है। Safe State वह स्थिति है जिसमें कम से कम एक सुरक्षित अनुक्रम (safe sequence) मौजूद होता है। Unsafe State का अर्थ यह नहीं है कि Deadlock हो चुका है, बल्कि इसका मतलब है कि सिस्टम अब Deadlock से बचने की पूर्ण गारंटी नहीं दे सकता।',
+      sampleRubric: {
+        bankersPurpose: 3,
+        safeVsUnsafe: 4,
+        unsafeNotDeadlockClarity: 3,
+      },
+    },
+    {
+      id: 'os-d-3-hi',
+      subject: 'Operating Systems',
+      topic: 'Deadlocks & Banker\'s Algorithm',
+      difficulty: 'Beginner',
+      question: 'Deadlock, Starvation और Livelock के बीच क्या अंतर है? प्रत्येक के लिए एक सरल वास्तविक जीवन (real-life) उदाहरण दीजिए।',
+      context: 'कॉन्करेंसी (concurrency) अवधारणाओं और संचार स्पष्टता की जांच।',
+      keyConcepts: [
+        'Deadlock definition',
+        'Starvation definition',
+        'Livelock definition',
+        'Real-world analogy',
+      ],
+      sampleAnswer: 'Deadlock में प्रक्रियाएं अनिश्चित काल तक अवरुद्ध रहती हैं। Starvation में उच्च प्राथमिकता वाली प्रक्रियाओं के कारण किसी प्रक्रिया को संसाधन नहीं मिल पाता। Livelock में प्रक्रियाएं अपनी स्थिति बदलती रहती हैं लेकिन कोई वास्तविक प्रगति नहीं होती।',
+      sampleRubric: {
+        deadlockConcept: 3,
+        starvationConcept: 3,
+        livelockConcept: 2,
+        analogies: 2,
+      },
+    },
+  ],
+
+  'dbms-acid': [
+    {
+      id: 'dbms-a-1-hi',
+      subject: 'Database Management Systems',
+      topic: 'ACID Properties & Transactions',
+      difficulty: 'Beginner',
+      question: 'Database Transaction के ACID गुण क्या हैं? खाता A से खाता B में 100 रुपये के ट्रांसफर का उदाहरण देकर प्रत्येक गुण को समझाइए।',
+      context: 'क्लासिक मौखिक प्रश्न। परीक्षक ACID के प्रत्येक अक्षर को ठोस बैंकिंग उदाहरण से जोड़कर देखता है।',
+      keyConcepts: [
+        'Atomicity',
+        'Consistency',
+        'Isolation',
+        'Durability',
+      ],
+      sampleAnswer: 'ACID का अर्थ है: Atomicity (या तो दोनों खातों का लेन-देन पूरा होगा या बिल्कुल नहीं), Consistency (लेन-देन से पहले और बाद में कुल राशि समान रहती है), Isolation (मध्यवर्ती अधूरा लेन-देन अन्य उपयोगकर्ताओं को नहीं दिखता), और Durability (कमिट होने के बाद डेटा डिस्क पर सुरक्षित रहता है)।',
+      sampleRubric: {
+        allFourExplained: 4,
+        bankingExampleApplied: 4,
+        walDurabilityClarity: 2,
+      },
+    },
+  ],
+
+  'cn-tcp': [
+    {
+      id: 'cn-t-1-hi',
+      subject: 'Computer Networks',
+      topic: 'TCP 3-Way Handshake & Flow Control',
+      difficulty: 'Intermediate',
+      question: 'TCP 3-Way Handshake कैसे काम करता है? SYN, SYN-ACK और ACK पैकेटों का क्रम और उनका मुख्य उद्देश्य समझाइए।',
+      context: 'कनेक्शन स्थापना और अनुक्रम संख्या तुल्यकालन की जांच।',
+      keyConcepts: [
+        'SYN packet',
+        'SYN-ACK packet',
+        'ACK packet',
+        'Sequence number synchronization',
+      ],
+      sampleAnswer: 'TCP कनेक्शन स्थापित करने के लिए: क्लाइंट पहले SYN पैकेट भेजता है, सर्वर SYN-ACK पैकेट के साथ उत्तर देता है, और अंत में क्लाइंट ACK भेजता है। इसके बाद दोनों पक्षों के बीच डेटा ट्रांसफर शुरू होता है।',
+      sampleRubric: {
+        threeWaySteps: 4,
+        seqAckNumbersExplained: 3,
+        connectionStateTransitions: 3,
+      },
+    },
+  ],
+
+  'dsa-trees': [
+    {
+      id: 'dsa-t-1-hi',
+      subject: 'Data Structures & Algorithms',
+      topic: 'Binary Search Trees & AVL Balancing',
+      difficulty: 'Intermediate',
+      question: 'Binary Search Tree (BST) और Balanced AVL Tree में क्या अंतर है? AVL Tree में Balance Factor का क्या महत्व है?',
+      context: 'संतुलित ट्री और रोटेशन तंत्र की जांच।',
+      keyConcepts: [
+        'BST property',
+        'AVL height balance',
+        'Balance Factor',
+        'Rotations (LL, RR, LR, RL)',
+      ],
+      sampleAnswer: 'एक साधारण BST में विषम डेटा के कारण ऊँचाई O(n) हो सकती है। AVL Tree एक स्व-संतुलित BST है जहाँ प्रत्येक नोड का Balance Factor -1, 0, या +1 होना चाहिए। असंतुलन होने पर रोटेशन (LL, RR, LR, RL) द्वारा संतुलन बहाल किया जाता है।',
+      sampleRubric: {
+        balanceFactorDefined: 3,
+        fourRotationsExplained: 4,
+        timeComplexityJustification: 3,
+      },
+    },
+  ],
+};
+
+// Bilingual concept keyword aliases for precise semantic evaluation in both English and Hindi
+export const CONCEPT_ALIASES = {
+  'mutual exclusion': ['mutual exclusion', 'म्यूचुअल', 'एक्सक्लूजन', 'परस्पर अपवर्जन', 'mutual'],
+  'hold and wait': ['hold and wait', 'होल्ड', 'वेट', 'hold', 'wait', 'धारण'],
+  'no preemption': ['no preemption', 'प्रीएम्प्शन', 'प्रीमेप्शन', 'preemption', 'अपहरण'],
+  'circular wait': ['circular wait', 'सर्कुलर', 'चक्रीय', 'circular', 'cycle'],
+  'resource ordering': ['resource ordering', 'रिसोर्स आर्डरिंग', 'ordering', 'क्रम', 'priority'],
+  'safe state': ['safe state', 'सेफ स्टेट', 'सुरक्षित अवस्था', 'safe sequence'],
+  'unsafe state': ['unsafe state', 'अनसेफ स्टेट', 'असुरक्षित अवस्था'],
+  'banker': ['banker', 'बैंकर', 'banker algorithm'],
+  'deadlock': ['deadlock', 'डेडलॉक', 'गतिरोध'],
+  'starvation': ['starvation', 'स्टारवेशन', 'भुखमरी'],
+  'livelock': ['livelock', 'लाइवलॉक'],
+  'atomicity': ['atomicity', 'एटॉमिकिटी', 'atomic', 'ऑल ऑर नथिंग'],
+  'consistency': ['consistency', 'कंसिस्टेंसी', 'सुसंगतता'],
+  'isolation': ['isolation', 'आइसोलेशन', 'अलगाव'],
+  'durability': ['durability', 'ड्यूरेबिलिटी', 'स्थायित्व'],
+  'syn': ['syn', 'सिंक', 'synchronize'],
+  'ack': ['ack', 'एकनॉलेजमेंट', 'acknowledgment'],
+  'balance factor': ['balance factor', 'बैलेंस फैक्टर', 'संतुलन'],
+  'rotation': ['rotation', 'रोटेशन', 'घूर्णन'],
+};
+
+export function matchesConcept(studentAnswerClean, concept) {
+  if (!studentAnswerClean || !concept) return false;
+  const answer = studentAnswerClean.toLowerCase();
+  const cLower = concept.toLowerCase();
+
+  // 1. Direct inclusion
+  if (answer.includes(cLower)) return true;
+
+  // 2. Individual words > 3 chars (Unicode aware)
+  const terms = cLower.replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean);
+  if (terms.some((t) => t.length > 3 && answer.includes(t))) return true;
+
+  // 3. Aliases matching
+  for (const [key, aliases] of Object.entries(CONCEPT_ALIASES)) {
+    if (cLower.includes(key)) {
+      if (aliases.some((alias) => answer.includes(alias.toLowerCase()))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Generic fallback question generator when user selects custom topics or subjects
-export const generateCustomMockQuestions = (subject, topic, count = 3) => {
+export const generateCustomMockQuestions = (subject, topic, count = 3, language = 'English') => {
   const cleanSubject = subject || 'Computer Science';
   const cleanTopic = topic || 'General Engineering Fundamentals';
+  const isHindi = language === 'Hindi';
+
+  if (isHindi) {
+    return [
+      {
+        id: `custom-1-hi`,
+        subject: cleanSubject,
+        topic: cleanTopic,
+        difficulty: 'Intermediate',
+        question: `${cleanSubject} के संदर्भ में, ${cleanTopic} के मूलभूत सिद्धांत क्या हैं? इनका व्यावहारिक महत्व समझाइए।`,
+        context: `${cleanTopic} की परिभाषाओं, बाधाओं और डिजाइन लक्ष्यों का परीक्षण।`,
+        keyConcepts: [
+          `${cleanTopic} की परिभाषा`,
+          'Trade-offs और बाधाएं',
+          'वास्तविक उद्योग उपयोग (Use Case)',
+        ],
+        sampleAnswer: `${cleanSubject} में ${cleanTopic} का कार्यान्वयन करते समय स्केलेबिलिटी, फॉल्ट टॉलरेंस और अनुमानित प्रदर्शन सुनिश्चित करना मुख्य लक्ष्य होता है। एक अच्छा उत्तर मूल परिभाषा और व्यावहारिक उपयोग को कवर करता है।`,
+        sampleRubric: {
+          definition: 3,
+          principles: 4,
+          tradeoffsAndApplication: 3,
+        },
+      },
+      {
+        id: `custom-2-hi`,
+        subject: cleanSubject,
+        topic: cleanTopic,
+        difficulty: 'Advanced',
+        question: `${cleanTopic} के प्रदर्शन ट्रेड-ऑफ (Performance Trade-offs) और वैकल्पिक दृष्टिकोणों की तुलना कीजिए। आप एक के स्थान पर दूसरे को कब चुनेंगे?`,
+        context: `आलोचनात्मक सोच और तुलनात्मक विश्लेषण का परीक्षण।`,
+        keyConcepts: [
+          'वैकल्पिक दृष्टिकोणों की तुलना',
+          'Time & Space Complexity',
+          'Production निर्णय मानदंड',
+        ],
+        sampleAnswer: `${cleanTopic} के विभिन्न विकल्पों का मूल्यांकन थ्रूपुट, सिस्टम जटिलता और विफलता सहनशीलता के आधार पर किया जाता है।`,
+        sampleRubric: {
+          comparisonClarity: 4,
+          metricsAndTradeoffs: 3,
+          decisionCriteria: 3,
+        },
+      },
+      {
+        id: `custom-3-hi`,
+        subject: cleanSubject,
+        topic: cleanTopic,
+        difficulty: 'Beginner',
+        question: `एक वास्तविक सॉफ्टवेयर सिस्टम में ${cleanTopic} कैसे संचालित होता है, इसका एक चरण-दर-चरण (step-by-step) उदाहरण दीजिए।`,
+        context: `जटिल तकनीकी विचारों को मौखिक रूप से उदाहरण के साथ व्यक्त करने की क्षमता।`,
+        keyConcepts: [
+          'Step-by-step flow',
+          'Input और Output विशेषताएं',
+          'विफलता और सीमा शर्तें (Boundary conditions)',
+        ],
+        sampleAnswer: `एक संपूर्ण उदाहरण प्रारंभिक ट्रिगर, सत्यापन, स्थिति परिवर्तन और अंतिम आउटपुट को विस्तार से समझाता है।`,
+        sampleRubric: {
+          structuredFlow: 4,
+          realisticScenario: 3,
+          communicationClarity: 3,
+        },
+      },
+    ].slice(0, count);
+  }
 
   return [
     {

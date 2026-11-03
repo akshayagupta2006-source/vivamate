@@ -11,7 +11,13 @@ import {
   clarifyQuestion, 
   generateFinalReport 
 } from './geminiService.js';
-import { MOCK_QUESTIONS_DATABASE, generateCustomMockQuestions } from '../src/data/mockData.js';
+import { 
+  MOCK_QUESTIONS_DATABASE, 
+  MOCK_QUESTIONS_DATABASE_HINDI, 
+  generateCustomMockQuestions, 
+  matchesConcept 
+} from '../src/data/mockData.js';
+import { calculateGrade, getReadinessStatus } from '../src/utils/grading.js';
 
 dotenv.config();
 
@@ -31,6 +37,7 @@ export function generateAdaptiveFallbackQuestion({
   subject,
   topic,
   _difficulty = 'Intermediate',
+  language = 'English',
   currentQuestion,
   _studentAnswer,
   questionIndex,
@@ -38,21 +45,23 @@ export function generateAdaptiveFallbackQuestion({
   conversationHistory = [],
   evaluation = {},
 }) {
+  const isHindi = language === 'Hindi';
   const previousQuestions = [
     currentQuestion?.question || '',
     ...(conversationHistory || []).map((h) => h.question?.question || h.question || ''),
   ].filter(Boolean).map((q) => q.toLowerCase());
 
   const normalizedTopic = (topic || '').toLowerCase();
+  const db = isHindi ? MOCK_QUESTIONS_DATABASE_HINDI : MOCK_QUESTIONS_DATABASE;
   let pool = [];
   if (normalizedTopic.includes('deadlock') || normalizedTopic.includes('banker')) {
-    pool = MOCK_QUESTIONS_DATABASE['os-deadlocks'] || [];
+    pool = db['os-deadlocks'] || MOCK_QUESTIONS_DATABASE['os-deadlocks'] || [];
   } else if (normalizedTopic.includes('acid') || normalizedTopic.includes('transaction')) {
-    pool = MOCK_QUESTIONS_DATABASE['dbms-acid'] || [];
+    pool = db['dbms-acid'] || MOCK_QUESTIONS_DATABASE['dbms-acid'] || [];
   } else if (normalizedTopic.includes('handshake') || normalizedTopic.includes('tcp')) {
-    pool = MOCK_QUESTIONS_DATABASE['cn-tcp'] || [];
+    pool = db['cn-tcp'] || MOCK_QUESTIONS_DATABASE['cn-tcp'] || [];
   } else if (normalizedTopic.includes('tree') || normalizedTopic.includes('avl')) {
-    pool = MOCK_QUESTIONS_DATABASE['dsa-trees'] || [];
+    pool = db['dsa-trees'] || MOCK_QUESTIONS_DATABASE['dsa-trees'] || [];
   }
 
   const missing = evaluation.missingConcepts || [];
@@ -62,16 +71,22 @@ export function generateAdaptiveFallbackQuestion({
   // 1. If student struggled or omitted critical concepts, generate a targeted diagnostic probe
   if (missing.length > 0) {
     const targetGap = missing[0];
+    const questionText = isHindi
+      ? `आपने विषय के कुछ भाग समझाए, लेकिन "${targetGap}" का उल्लेख नहीं किया। ${topic} के संदर्भ में, "${targetGap}" कैसे कार्य करता है और इसका समाधान कैसे किया जाता है?`
+      : `You explained part of the concept, but didn't touch upon "${targetGap}". In the context of ${topic}, how does "${targetGap}" operate and how is it addressed?`;
+
     return {
       id: `adaptive-probe-${questionIndex + 1}-${Date.now()}`,
       questionNumber: questionIndex + 1,
       subject,
       topic,
-      difficulty: 'Targeted Remediation',
-      question: `You explained part of the concept, but didn't touch upon "${targetGap}". In the context of ${topic}, how does "${targetGap}" operate and how is it addressed?`,
-      context: `Adaptive follow-up probing student's missed concept: ${targetGap}`,
+      difficulty: isHindi ? 'लक्षित पुनरीक्षण' : 'Targeted Remediation',
+      question: questionText,
+      context: isHindi ? `छात्र की छूटी हुई अवधारणा पर अनुवर्ती प्रश्न: ${targetGap}` : `Adaptive follow-up probing student's missed concept: ${targetGap}`,
       keyConcepts: [targetGap, topic, 'Mechanism', 'Prevention/Handling'],
-      modelAnswer: `A thorough explanation of ${targetGap} defines the mechanism and how it specifically contributes to or mitigates issues in ${topic}.`,
+      modelAnswer: isHindi
+        ? `"${targetGap}" का संपूर्ण उत्तर इसकी कार्यप्रणाली और ${topic} में इसकी भूमिका को स्पष्ट करता है।`
+        : `A thorough explanation of ${targetGap} defines the mechanism and how it specifically contributes to or mitigates issues in ${topic}.`,
     };
   }
 
@@ -83,28 +98,41 @@ export function generateAdaptiveFallbackQuestion({
 
   if (unaskedInPool.length > 0) {
     const chosen = unaskedInPool[0];
-    const coveredHighlight = covered.length > 0 ? `You had a solid grasp of ${covered.slice(0, 2).join(' and ')}. ` : '';
+    const coveredHighlight = covered.length > 0
+      ? isHindi
+        ? `आपने ${covered.slice(0, 2).join(' और ')} की बहुत अच्छी समझ प्रदर्शित की। `
+        : `You had a solid grasp of ${covered.slice(0, 2).join(' and ')}. `
+      : '';
+    const prefix = isHindi ? 'अब अगले स्तर पर चलते हैं: ' : "Now let's delve deeper: ";
     return {
       ...chosen,
       questionNumber: questionIndex + 1,
-      question: `${coveredHighlight}Now let's delve deeper: ${chosen.question}`,
+      question: `${coveredHighlight}${prefix}${chosen.question}`,
     };
   }
 
   // 3. Fallback scenario question building on their answered concepts
   const anchor = covered[0] || topic;
+  const questionText = isHindi
+    ? score >= 7.5
+      ? `"${anchor}" पर बहुत अच्छा उत्तर। अब एक बड़े वितरित (distributed), उच्च-समवर्ती सिस्टम पर विचार करें: यह तंत्र कैसे स्केल करता है, और इसमें क्या विफलताएं या बॉटलनेक आ सकते हैं?`
+      : `आपने "${anchor}" का उल्लेख किया। क्या आप ${subject} में इस पद्धति की तुलना किसी वैकल्पिक तकनीक से कर सकते हैं और मुख्य ट्रेड-ऑफ़ समझा सकते हैं?`
+    : score >= 7.5
+      ? `Strong explanation on ${anchor}. Now consider a distributed, high-concurrency production system: How does this mechanism scale, and what failure modes or bottlenecks occur?`
+      : `You've touched upon ${anchor}. Can you compare this approach with an alternative method in ${subject}, and explain the core trade-offs between them?`;
+
   return {
     id: `adaptive-scenario-${questionIndex + 1}-${Date.now()}`,
     questionNumber: questionIndex + 1,
     subject,
     topic,
-    difficulty: score >= 7.5 ? 'Advanced Systems' : 'Intermediate Concept',
-    question: score >= 7.5
-      ? `Strong explanation on ${anchor}. Now consider a distributed, high-concurrency production system: How does this mechanism scale, and what failure modes or bottlenecks occur?`
-      : `You've touched upon ${anchor}. Can you compare this approach with an alternative method in ${subject}, and explain the core trade-offs between them?`,
-    context: `Adaptive analytical follow-up building on: ${anchor}`,
+    difficulty: score >= 7.5 ? (isHindi ? 'उन्नत सिस्टम डिजाइन' : 'Advanced Systems') : (isHindi ? 'मध्यवर्ती अवधारणा' : 'Intermediate Concept'),
+    question: questionText,
+    context: isHindi ? `विश्लेषणात्मक अनुवर्ती प्रश्न: ${anchor}` : `Adaptive analytical follow-up building on: ${anchor}`,
     keyConcepts: [topic, 'Trade-offs', 'System Design', 'Failure Modes'],
-    modelAnswer: `An exemplary response evaluates architectural constraints, scalability limits, and design compromises.`,
+    modelAnswer: isHindi
+      ? `एक उत्कृष्ट उत्तर सिस्टम की बाधाओं, स्केलेबिलिटी सीमाओं और विश्वसनीयता का मूल्यांकन करता है।`
+      : `An exemplary response evaluates architectural constraints, scalability limits, and design compromises.`,
   };
 }
 
@@ -162,29 +190,33 @@ app.post('/api/viva/start', async (req, res) => {
     }
 
     // Intelligent Curated Fallback
+    const isHindi = language === 'Hindi';
     const normalizedTopic = topic.toLowerCase();
+    const db = isHindi ? MOCK_QUESTIONS_DATABASE_HINDI : MOCK_QUESTIONS_DATABASE;
     let fallbackQuestions = null;
 
     if (normalizedTopic.includes('deadlock') || normalizedTopic.includes('banker')) {
-      fallbackQuestions = MOCK_QUESTIONS_DATABASE['os-deadlocks'];
+      fallbackQuestions = db['os-deadlocks'] || MOCK_QUESTIONS_DATABASE['os-deadlocks'];
     } else if (normalizedTopic.includes('acid') || normalizedTopic.includes('transaction')) {
-      fallbackQuestions = MOCK_QUESTIONS_DATABASE['dbms-acid'];
+      fallbackQuestions = db['dbms-acid'] || MOCK_QUESTIONS_DATABASE['dbms-acid'];
     } else if (normalizedTopic.includes('handshake') || normalizedTopic.includes('tcp')) {
-      fallbackQuestions = MOCK_QUESTIONS_DATABASE['cn-tcp'];
+      fallbackQuestions = db['cn-tcp'] || MOCK_QUESTIONS_DATABASE['cn-tcp'];
     } else if (normalizedTopic.includes('tree') || normalizedTopic.includes('avl')) {
-      fallbackQuestions = MOCK_QUESTIONS_DATABASE['dsa-trees'];
+      fallbackQuestions = db['dsa-trees'] || MOCK_QUESTIONS_DATABASE['dsa-trees'];
     }
 
     const pool = (fallbackQuestions && fallbackQuestions.length > 0)
       ? fallbackQuestions
-      : generateCustomMockQuestions(subject, topic, 4);
+      : generateCustomMockQuestions(subject, topic, 4, language);
 
     const firstQ = pool[Math.floor(Math.random() * pool.length)] || pool[0];
 
     return res.json({
       source: 'smart-rubric-demo',
       isLiveAI: false,
-      disclaimer: 'Curated Rubric Mode — Connect Gemini API key in settings or backend .env for dynamic AI generation.',
+      disclaimer: isHindi 
+        ? 'क्यूरेटेड रूब्रिक मोड — लाइव AI जेनरेशन के लिए सेटिंग्स में Gemini API Key जोड़ें।'
+        : 'Curated Rubric Mode — Connect Gemini API key in settings or backend .env for dynamic AI generation.',
       question: {
         ...firstQ,
         questionNumber: 1,
@@ -217,6 +249,8 @@ app.post('/api/viva/turn', async (req, res) => {
     }
 
     const apiKey = getApiKey(req);
+    const isLast = questionIndex >= totalQuestions;
+    const isHindi = language === 'Hindi';
 
     // Call Gemini if key available
     if (apiKey) {
@@ -241,6 +275,7 @@ app.post('/api/viva/turn', async (req, res) => {
             subject,
             topic,
             difficulty,
+            language,
             currentQuestion,
             studentAnswer,
             questionIndex,
@@ -266,28 +301,33 @@ app.post('/api/viva/turn', async (req, res) => {
     const missingConcepts = [];
 
     keyConcepts.forEach((concept) => {
-      const terms = concept.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ');
-      const match = terms.some((t) => t.length > 3 && cleanAnswer.includes(t));
+      const match = matchesConcept(cleanAnswer, concept);
       if (match) conceptsCovered.push(concept);
       else missingConcepts.push(concept);
     });
 
     const ratio = keyConcepts.length > 0 ? conceptsCovered.length / keyConcepts.length : 0.6;
     let baseScore = ratio * 7.5;
-    if (words.length >= 35) baseScore += 2.0;
-    else if (words.length >= 18) baseScore += 1.0;
+    if (words.length >= 25) baseScore += 2.0;
+    else if (words.length >= 12) baseScore += 1.0;
     else baseScore -= 1.0;
 
     const finalScore = Math.min(Math.max(Math.round(baseScore * 10) / 10, 3.0), 9.6);
-    let correctness = 'Needs Improvement';
-    if (finalScore >= 7.5) correctness = 'Correct & Comprehensive';
-    else if (finalScore >= 5.0) correctness = 'Partially Correct';
+    let correctness = isHindi ? 'सुधार की आवश्यकता (Needs Improvement)' : 'Needs Improvement';
+    if (finalScore >= 7.5) {
+      correctness = isHindi ? 'सटीक और संपूर्ण (Correct & Comprehensive)' : 'Correct & Comprehensive';
+    } else if (finalScore >= 5.0) {
+      correctness = isHindi ? 'आंशिक रूप से सही (Partially Correct)' : 'Partially Correct';
+    }
 
-    const examinerReaction = finalScore >= 7.5
-      ? `Good explanation! You clearly grasped ${conceptsCovered.slice(0, 2).join(' and ')}.`
-      : `You touched upon the idea, but missed critical points such as ${missingConcepts.slice(0, 2).join(' and ')}.`;
+    const examinerReaction = isHindi
+      ? finalScore >= 7.5
+        ? `बहुत बढ़िया उत्तर! आपने ${conceptsCovered.slice(0, 2).join(' और ') || topic} को बहुत अच्छी तरह समझाया।`
+        : `आपने उत्तर देने का अच्छा प्रयास किया, लेकिन ${missingConcepts.slice(0, 2).join(' और ') || 'कुछ मुख्य बिंदु'} छूट गए।`
+      : finalScore >= 7.5
+        ? `Good explanation! You clearly grasped ${conceptsCovered.slice(0, 2).join(' and ') || topic}.`
+        : `You touched upon the idea, but missed critical points such as ${missingConcepts.slice(0, 2).join(' and ') || 'key details'}.`;
 
-    const isLast = questionIndex >= totalQuestions;
     let nextQuestion = null;
 
     if (!isLast) {
@@ -296,6 +336,7 @@ app.post('/api/viva/turn', async (req, res) => {
         subject,
         topic,
         difficulty,
+        language,
         currentQuestion,
         studentAnswer,
         questionIndex,
@@ -310,21 +351,38 @@ app.post('/api/viva/turn', async (req, res) => {
       });
     }
 
+    const feedbackSummary = isHindi
+      ? `${keyConcepts.length} मुख्य अवधारणाओं में से ${conceptsCovered.length} को कवर किया गया।`
+      : `Covered ${conceptsCovered.length} of ${keyConcepts.length} core concepts.`;
+
+    const improvementTips = isHindi
+      ? [
+          missingConcepts.length > 0
+            ? `मौखिक परीक्षा में "${missingConcepts[0]}" का स्पष्ट रूप से उल्लेख करें।`
+            : 'तकनीकी शब्दावली का अच्छा उपयोग किया गया।',
+          'वास्तविक सिस्टम उदाहरणों के साथ उत्तर देने से अंक बेहतर होते हैं।',
+        ]
+      : [
+          missingConcepts.length > 0
+            ? `Explicitly mention "${missingConcepts[0]}" when answering oral questions.`
+            : 'Good technical terminology used.',
+          'State real-world trade-offs or operational impact to get full marks in viva voce.',
+        ];
+
     return res.json({
       source: 'smart-rubric-demo',
       isLiveAI: false,
-      disclaimer: 'Evaluated with curated rubric criteria. Connect Gemini API key for live semantic evaluation.',
+      disclaimer: isHindi
+        ? 'क्यूरेटेड रूब्रिक द्वारा मूल्यांकित। लाइव सेमांटिक AI के लिए Gemini API Key जोड़ें।'
+        : 'Evaluated with curated rubric criteria. Connect Gemini API key for live semantic evaluation.',
       evaluation: {
         score: finalScore,
         correctness,
         conceptsCovered,
         missingConcepts,
-        feedbackSummary: `Covered ${conceptsCovered.length} of ${keyConcepts.length} core concepts.`,
-        improvementTips: [
-          missingConcepts.length > 0 ? `Explicitly mention "${missingConcepts[0]}" when answering oral questions.` : 'Good technical terminology used.',
-          'State real-world trade-offs or operational impact to get full marks in viva voce.',
-        ],
-        modelAnswer: currentQuestion.sampleAnswer || 'Ideal answer covers all primary definitions and edge cases.',
+        feedbackSummary,
+        improvementTips,
+        modelAnswer: currentQuestion.modelAnswer || currentQuestion.sampleAnswer || (isHindi ? 'आदर्श उत्तर सभी मुख्य परिभाषाओं और उपयोग के मामलों को कवर करता है।' : 'Ideal answer covers all primary definitions and edge cases.'),
       },
       examinerReaction,
       nextQuestion,
@@ -338,11 +396,12 @@ app.post('/api/viva/turn', async (req, res) => {
 // 4. AI Hint
 app.post('/api/viva/hint', async (req, res) => {
   try {
-    const { question, topic } = req.body;
+    const { question, topic, language = 'English' } = req.body;
     const apiKey = getApiKey(req);
+    const isHindi = language === 'Hindi';
 
     if (apiKey) {
-      const hintData = await generateAIHint({ question, topic, apiKey });
+      const hintData = await generateAIHint({ question, topic, language, apiKey });
       if (hintData) {
         return res.json({ source: 'gemini-ai', ...hintData });
       }
@@ -350,7 +409,9 @@ app.post('/api/viva/hint', async (req, res) => {
 
     return res.json({
       source: 'smart-rubric-demo',
-      hint: `Think about how the core principles of ${topic} affect memory, CPU states, or transaction atomicity. What happens if a resource cannot be preempted?`,
+      hint: isHindi
+        ? `विचार करें कि ${topic} के मूल सिद्धांत मेमोरी, सीपीयू स्थिति या सिस्टम पर कैसे प्रभाव डालते हैं। मुख्य शर्तों पर ध्यान दें।`
+        : `Think about how the core principles of ${topic} affect memory, CPU states, or transaction atomicity. What happens if a resource cannot be preempted?`,
     });
   } catch {
     res.status(500).json({ error: 'Hint generation failed' });
@@ -362,6 +423,7 @@ app.post('/api/viva/clarify', async (req, res) => {
   try {
     const { question, topic, language = 'English' } = req.body;
     const apiKey = getApiKey(req);
+    const isHindi = language === 'Hindi';
 
     if (apiKey) {
       const clarified = await clarifyQuestion({ question, topic, language, apiKey });
@@ -372,7 +434,9 @@ app.post('/api/viva/clarify', async (req, res) => {
 
     return res.json({
       source: 'smart-rubric-demo',
-      clarification: `In simpler terms: The examiner is asking for the core mechanism behind "${question}". Focus on defining the conditions, why they matter, and what problem they prevent.`,
+      clarification: isHindi
+        ? `सरल शब्दों में: परीक्षक प्रश्न "${question}" के पीछे के मुख्य तंत्र के बारे में पूछ रहा है। मुख्य शर्तों, उनके महत्व और वे किस समस्या को रोकते हैं, उस पर ध्यान दें।`
+        : `In simpler terms: The examiner is asking for the core mechanism behind "${question}". Focus on defining the conditions, why they matter, and what problem they prevent.`,
     });
   } catch {
     res.status(500).json({ error: 'Clarification failed' });
@@ -382,22 +446,36 @@ app.post('/api/viva/clarify', async (req, res) => {
 // 6. Comprehensive Final Report Synthesis
 app.post('/api/viva/final-report', async (req, res) => {
   try {
-    const { subject, topic, sessionResults = [] } = req.body;
+    const { subject, topic, sessionResults = [], language = 'English' } = req.body;
     const apiKey = getApiKey(req);
+    const isHindi = language === 'Hindi';
 
     if (apiKey && sessionResults.length > 0) {
       const geminiReport = await generateFinalReport({
         subject,
         topic,
         sessionResults,
+        language,
         apiKey,
       });
 
       if (geminiReport) {
+        const rawScore = Number.isFinite(geminiReport.totalScore)
+          ? geminiReport.totalScore
+          : (Number.isFinite(geminiReport.averageScoreOutOf10) ? Math.round(geminiReport.averageScoreOutOf10 * 10) : 0);
+        const scoreOutOf100 = Math.max(0, Math.min(100, rawScore));
+        const grade = calculateGrade(scoreOutOf100);
+        const status = geminiReport.readinessStatus || getReadinessStatus(scoreOutOf100, language);
+
         return res.json({
           source: 'gemini-ai',
           isLiveAI: true,
-          report: geminiReport,
+          report: {
+            ...geminiReport,
+            totalScore: scoreOutOf100,
+            overallGrade: grade,
+            readinessStatus: status,
+          },
         });
       }
     }
@@ -410,21 +488,8 @@ app.post('/api/viva/final-report', async (req, res) => {
     const allCovered = sessionResults.flatMap((r) => r.evaluation?.conceptsCovered || []);
     const allMissed = sessionResults.flatMap((r) => r.evaluation?.missingConcepts || []);
 
-    let grade = 'B';
-    let status = 'Solid Conceptual Foundation';
-    if (scoreOutOf100 >= 85) {
-      grade = 'A+';
-      status = 'Viva Master - High Distinction';
-    } else if (scoreOutOf100 >= 75) {
-      grade = 'A';
-      status = 'Exam Ready (High Confidence)';
-    } else if (scoreOutOf100 >= 60) {
-      grade = 'B+';
-      status = 'Good Understanding with Minor Gaps';
-    } else if (scoreOutOf100 < 50) {
-      grade = 'C';
-      status = 'Targeted Revision Recommended';
-    }
+    const grade = calculateGrade(scoreOutOf100);
+    const status = getReadinessStatus(scoreOutOf100, language);
 
     return res.json({
       source: 'smart-rubric-demo',
@@ -440,13 +505,21 @@ app.post('/api/viva/final-report', async (req, res) => {
         readinessStatus: status,
         strongConcepts: [...new Set(allCovered)].slice(0, 5),
         weakConcepts: [...new Set(allMissed)].slice(0, 5),
-        revisionChecklist: [
-          'Review the formal definitions and conditions for ' + topic,
-          'Practice speaking the exact technical terms out loud to improve fluency',
-          'Memorize at least one real-world architectural example or code snippet',
-        ],
-        examinerExecutiveSummary: `The candidate demonstrated a clear foundational understanding of ${topic}. Response depth was solid, though precision regarding boundary conditions and technical keywords can be sharpened for university examinations.`,
-        recommendedNextTopic: `${subject} - Advanced Deep Dive`,
+        revisionChecklist: isHindi
+          ? [
+              `${topic} की औपचारिक परिभाषाओं और शर्तों को दोहराएं`,
+              'मौखिक प्रवाह में सुधार के लिए तकनीकी शब्दों को बोलकर अभ्यास करें',
+              'कम से कम एक वास्तविक वास्तुशिल्प उदाहरण या कोड स्निपेट याद रखें',
+            ]
+          : [
+              'Review the formal definitions and conditions for ' + topic,
+              'Practice speaking the exact technical terms out loud to improve fluency',
+              'Memorize at least one real-world architectural example or code snippet',
+            ],
+        examinerExecutiveSummary: isHindi
+          ? `उम्मीदवार ने ${topic} की स्पष्ट वैचारिक समझ प्रदर्शित की। उत्तरों की गहराई ठोस थी, हालांकि विश्वविद्यालय स्तर की मौखिक परीक्षा के लिए सीमा स्थितियों और तकनीकी शब्दों में अधिक सटीकता लाई जा सकती है।`
+          : `The candidate demonstrated a clear foundational understanding of ${topic}. Response depth was solid, though precision regarding boundary conditions and technical keywords can be sharpened for university examinations.`,
+        recommendedNextTopic: isHindi ? `${subject} - गहन अध्ययन (Deep Dive)` : `${subject} - Advanced Deep Dive`,
       },
     });
   } catch (err) {
@@ -458,14 +531,19 @@ app.post('/api/viva/final-report', async (req, res) => {
 // 7. Revision mode for weak topics
 app.post('/api/viva/revision', async (req, res) => {
   try {
-    const { weakConcepts = [], subject = 'Computer Science' } = req.body;
+    const { weakConcepts = [], subject = 'Computer Science', language = 'English' } = req.body;
+    const isHindi = language === 'Hindi';
     const questions = weakConcepts.map((concept, idx) => ({
       id: `rev-${idx}-${Date.now()}`,
       subject,
       topic: concept,
-      question: `Quick Flash Question: In your own words, define "${concept}" and explain why it is essential in ${subject}.`,
-      keyConcepts: [concept, 'Definition', 'Use case'],
-      modelAnswer: `"${concept}" is crucial because it ensures correctness and prevents unexpected system failure.`,
+      question: isHindi
+        ? `त्वरित पुनरीक्षण प्रश्न: अपने शब्दों में बताएं कि "${concept}" क्या है और यह ${subject} में क्यों महत्वपूर्ण है?`
+        : `Quick Flash Question: In your own words, define "${concept}" and explain why it is essential in ${subject}.`,
+      keyConcepts: [concept, isHindi ? 'परिभाषा' : 'Definition', isHindi ? 'उपयोग' : 'Use case'],
+      modelAnswer: isHindi
+        ? `"${concept}" अत्यंत महत्वपूर्ण है क्योंकि यह प्रणाली की शुद्धता सुनिश्चित करता है और अप्रत्याशित विफलताओं को रोकता है।`
+        : `"${concept}" is crucial because it ensures correctness and prevents unexpected system failure.`,
     }));
 
     res.json({ questions });
@@ -490,6 +568,7 @@ app.post('/api/viva/revision/evaluate', async (req, res) => {
     }
 
     const apiKey = getApiKey(req);
+    const isHindi = language === 'Hindi';
 
     if (apiKey) {
       const geminiResult = await evaluateTurnAndFollowUp({
@@ -515,7 +594,7 @@ app.post('/api/viva/revision/evaluate', async (req, res) => {
       }
     }
 
-    // Heuristic Evaluation Fallback
+    // Heuristic Evaluation Fallback (with Unicode & Hindi concept matching)
     const cleanAnswer = studentAnswer.toLowerCase();
     const words = cleanAnswer.split(/\s+/).filter(Boolean);
     const keyConcepts = currentQuestion?.keyConcepts || [topic || 'Key Concepts'];
@@ -524,10 +603,11 @@ app.post('/api/viva/revision/evaluate', async (req, res) => {
     const missingConcepts = [];
 
     keyConcepts.forEach((concept) => {
-      const terms = concept.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ');
-      const match = terms.some((t) => t.length > 3 && cleanAnswer.includes(t));
-      if (match) conceptsCovered.push(concept);
-      else missingConcepts.push(concept);
+      if (matchesConcept(cleanAnswer, concept)) {
+        conceptsCovered.push(concept);
+      } else {
+        missingConcepts.push(concept);
+      }
     });
 
     const ratio = keyConcepts.length > 0 ? conceptsCovered.length / keyConcepts.length : 0.6;
@@ -537,13 +617,17 @@ app.post('/api/viva/revision/evaluate', async (req, res) => {
     else baseScore -= 1.0;
 
     const finalScore = Math.min(Math.max(Math.round(baseScore * 10) / 10, 3.0), 9.6);
-    let correctness = 'Needs Improvement';
-    if (finalScore >= 7.5) correctness = 'Correct & Comprehensive';
-    else if (finalScore >= 5.0) correctness = 'Partially Correct';
+    let correctness = isHindi ? 'सुधार की आवश्यकता है' : 'Needs Improvement';
+    if (finalScore >= 7.5) correctness = isHindi ? 'सही और व्यापक' : 'Correct & Comprehensive';
+    else if (finalScore >= 5.0) correctness = isHindi ? 'आंशिक रूप से सही' : 'Partially Correct';
 
-    const examinerReaction = finalScore >= 7.5
-      ? `Great revision recall! You clearly grasped ${conceptsCovered.slice(0, 2).join(' and ')}.`
-      : `Good attempt, but make sure to reinforce key points like ${missingConcepts.slice(0, 2).join(' and ')}.`;
+    const examinerReaction = isHindi
+      ? (finalScore >= 7.5
+          ? `शानदार पुनरीक्षण! आपने ${conceptsCovered.slice(0, 2).join(' और ') || 'मुख्य अवधारणा'} को स्पष्ट रूप से समझाया।`
+          : `अच्छा प्रयास, लेकिन ${missingConcepts.slice(0, 2).join(' और ') || 'मुख्य बिंदुओं'} पर विशेष ध्यान दें।`)
+      : (finalScore >= 7.5
+          ? `Great revision recall! You clearly grasped ${conceptsCovered.slice(0, 2).join(' and ')}.`
+          : `Good attempt, but make sure to reinforce key points like ${missingConcepts.slice(0, 2).join(' and ')}.`);
 
     return res.json({
       source: 'smart-rubric-demo',
@@ -553,13 +637,19 @@ app.post('/api/viva/revision/evaluate', async (req, res) => {
         correctness,
         conceptsCovered,
         missingConcepts,
-        feedbackSummary: `Covered ${conceptsCovered.length} of ${keyConcepts.length} core revision concepts.`,
+        feedbackSummary: isHindi
+          ? `${keyConcepts.length} में से ${conceptsCovered.length} पुनरीक्षण अवधारणाओं को कवर किया।`
+          : `Covered ${conceptsCovered.length} of ${keyConcepts.length} core revision concepts.`,
         improvementTips: [
           missingConcepts.length > 0
-            ? `Make sure to mention "${missingConcepts[0]}" when defining this concept.`
-            : 'Strong conceptual recall demonstrated.',
+            ? (isHindi
+                ? `इस अवधारणा को परिभाषित करते समय "${missingConcepts[0]}" का उल्लेख अवश्य करें।`
+                : `Make sure to mention "${missingConcepts[0]}" when defining this concept.`)
+            : (isHindi ? 'मजबूत वैचारिक समझ का प्रदर्शन।' : 'Strong conceptual recall demonstrated.'),
         ],
-        modelAnswer: currentQuestion?.modelAnswer || 'A complete answer defines the concept, its operational purpose, and failure handling.',
+        modelAnswer: currentQuestion?.modelAnswer || (isHindi
+          ? 'एक पूर्ण उत्तर अवधारणा, उसके परिचालन उद्देश्य और विफलता से निपटने की व्याख्या करता है।'
+          : 'A complete answer defines the concept, its operational purpose, and failure handling.'),
       },
       examinerReaction,
     });

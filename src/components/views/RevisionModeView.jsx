@@ -61,12 +61,12 @@ export default function RevisionModeView({
   useEffect(() => {
     async function load() {
       setIsLoading(true);
-      const res = await fetchRevisionQuestions({ weakConcepts, subject });
+      const res = await fetchRevisionQuestions({ weakConcepts, subject, language: speechLanguage });
       setQuestions(res.questions || []);
       setIsLoading(false);
     }
     load();
-  }, [weakConcepts, subject]);
+  }, [weakConcepts, subject, speechLanguage]);
 
   // Stop recognition when unmounting
   useEffect(() => {

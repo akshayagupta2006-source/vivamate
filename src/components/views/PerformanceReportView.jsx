@@ -11,6 +11,7 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { calculateGrade, getGradeBadgeColor } from '../../utils/grading';
 
 export default function PerformanceReportView({
   config = {},
@@ -20,7 +21,10 @@ export default function PerformanceReportView({
   onPracticeWeakTopics,
   onReturnDashboard,
 }) {
-  const totalScore = report.totalScore ?? Math.round((report.averageScoreOutOf10 || 7.5) * 10);
+  const totalScore = Number.isFinite(report.totalScore)
+    ? report.totalScore
+    : (Number.isFinite(report.averageScoreOutOf10) ? Math.round(report.averageScoreOutOf10 * 10) : 0);
+  const finalGrade = calculateGrade(totalScore);
 
   useEffect(() => {
     if (totalScore >= 65) {
@@ -39,12 +43,6 @@ export default function PerformanceReportView({
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const getGradeBadge = (grade) => {
-    if ((grade || '').startsWith('A')) return 'bg-emerald-950 text-emerald-400 border-emerald-700/80';
-    if ((grade || '').startsWith('B')) return 'bg-indigo-950 text-indigo-400 border-indigo-700/80';
-    return 'bg-amber-950 text-amber-400 border-amber-700/80';
   };
 
   return (
@@ -87,9 +85,9 @@ export default function PerformanceReportView({
               </div>
             </div>
 
-            <div className={`px-4 py-3 rounded-2xl border text-center ${getGradeBadge(report.overallGrade)}`}>
+            <div className={`px-4 py-3 rounded-2xl border text-center ${getGradeBadgeColor(finalGrade)}`}>
               <div className="text-[10px] font-bold uppercase tracking-wider">Grade</div>
-              <div className="text-3xl font-black">{report.overallGrade || 'A'}</div>
+              <div className="text-3xl font-black">{finalGrade}</div>
             </div>
           </div>
         </div>
